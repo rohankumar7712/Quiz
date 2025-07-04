@@ -73,20 +73,55 @@ document.getElementById("saveQ").onclick = () => {
   document.getElementById("saveMsg").textContent = "Quiz saved! Code: " + code;
 };
 
-/* ---------- HISTORY ---------- */
-function loadQuizHistory(){
+/* ---------- HISTORY WITH UPDATE FEATURE ---------- */
+function loadQuizHistory() {
   const list = document.getElementById("quizList");
   list.innerHTML = "";
-  Object.keys(localStorage).filter(k=>k.startsWith("quiz_")).forEach(k=>{
-    const q = JSON.parse(localStorage.getItem(k));
-    list.innerHTML += `<div class="border rounded p-2 mb-2">
-        <strong>${q.title}</strong><br>
-        Code: <code>${k.slice(5)}</code><br>
-        ${q.questions.length} questions<br>
-        Start: ${q.startAt}<br>
-        End: ${q.endAt}
-      </div>`;
-  });
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("quiz_"))
+    .forEach(k => {
+      const q = JSON.parse(localStorage.getItem(k));
+      const code = k.slice(5);
+
+      list.innerHTML += `
+        <div class="border rounded p-3 mb-3">
+          <strong>${q.title}</strong><br>
+          Code: <code>${code}</code><br>
+          <label class="form-label mt-2">Start Time:</label>
+          <input type="datetime-local" id="start_${code}" class="form-control mb-2" value="${q.startAt}">
+          
+          <label class="form-label">End Time:</label>
+          <input type="datetime-local" id="end_${code}" class="form-control mb-2" value="${q.endAt}">
+          
+          <button class="btn btn-sm btn-success" onclick="updateQuizTime('${code}')">Update Time</button>
+        </div>
+      `;
+    });
+}
+
+function updateQuizTime(code) {
+  const startInput = document.getElementById(`start_${code}`);
+  const endInput = document.getElementById(`end_${code}`);
+
+  const newStart = startInput.value;
+  const newEnd = endInput.value;
+
+  if (!newStart || !newEnd) {
+    alert("Please enter both start and end time.");
+    return;
+  }
+  if (new Date(newStart) >= new Date(newEnd)) {
+    alert("Start time must be before end time.");
+    return;
+  }
+
+  const key = "quiz_" + code;
+  const quiz = JSON.parse(localStorage.getItem(key));
+  quiz.startAt = newStart;
+  quiz.endAt = newEnd;
+
+  localStorage.setItem(key, JSON.stringify(quiz));
+  alert("✅ Time updated successfully!");
 }
 
 /* ---------- PARSER ---------- */
