@@ -1,11 +1,13 @@
-// js/admin.js (Firebase version)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, getDocs, updateDoc,
-  deleteDoc, doc, setDoc, getDoc
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+
+import {
+  getFirestore, collection, getDocs, updateDoc,
+  deleteDoc, doc, setDoc, getDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-// Your Firebase config
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyC_lvF65P7vaKYnKEMrpHfJroMe-vh3w4U",
   authDomain: "quizapp-f370d.firebaseapp.com",
@@ -15,11 +17,10 @@ const firebaseConfig = {
   appId: "1:822956185807:web:3d2244d53f9bb61ec33fba"
 };
 
-// Init Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Admin login
+// Admin Login
 document.getElementById("loginBtn").onclick = () => {
   const user = document.getElementById("user").value.trim();
   const pass = document.getElementById("pass").value.trim();
@@ -29,13 +30,13 @@ document.getElementById("loginBtn").onclick = () => {
     document.getElementById("loginBox").classList.add("hidden");
     document.getElementById("builder").classList.remove("hidden");
     document.getElementById("history").classList.remove("hidden");
-    loadQuizHistory();
+    listenToQuizHistory(); // ✅ use listener instead of manual load
   } else {
     errBox.textContent = "Invalid username or password!";
   }
 };
 
-// Add quiz question block
+// Add question block
 document.getElementById("addQ").onclick = function () {
   const div = document.createElement("div");
   div.classList.add("mb-3");
@@ -96,7 +97,6 @@ document.getElementById("saveQ").onclick = async function () {
   });
 
   document.getElementById("saveMsg").textContent = "Quiz saved! Code: " + code;
-  loadQuizHistory();
 };
 
 // Parse text to questions
@@ -147,49 +147,51 @@ document.getElementById("parseTextBtn").onclick = function () {
   }
 };
 
-// Load quiz history from Firestore
-async function loadQuizHistory() {
+// Real-time Quiz List
+function listenToQuizHistory() {
   const output = document.getElementById("quizList");
-  output.innerHTML = "";
+  const quizzesRef = collection(db, "quizzes");
 
-  const snapshot = await getDocs(collection(db, "quizzes"));
-  snapshot.forEach(docSnap => {
-    const quiz = docSnap.data();
-    const code = docSnap.id;
+  onSnapshot(quizzesRef, snapshot => {
+    output.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const quiz = docSnap.data();
+      const code = docSnap.id;
 
-    output.innerHTML += `
-      <div class="border p-2 rounded mb-2">
-        <strong>${quiz.title}</strong><br>
-        Code: <code>${code}</code><br>
-        Start: <input type="datetime-local" value="${quiz.startAt}" id="start_${code}" class="form-control mb-1" />
-        End: <input type="datetime-local" value="${quiz.endAt}" id="end_${code}" class="form-control mb-1" />
-        <button class="btn btn-sm btn-success me-2" onclick="updateQuizTime('${code}')">Update Time</button>
-        <button class="btn btn-sm btn-danger me-2" onclick="deleteQuiz('${code}')">Delete</button>
-        <button class="btn btn-sm btn-primary" onclick="viewLeaderboard('${code}')">Leaderboard</button>
-      </div>
-    `;
+      output.innerHTML += `
+        <div class="border p-2 rounded mb-2">
+          <strong>${quiz.title}</strong><br>
+          Code: <code>${code}</code><br>
+          Start: <input type="datetime-local" value="${quiz.startAt}" id="start_${code}" class="form-control mb-1" />
+          End: <input type="datetime-local" value="${quiz.endAt}" id="end_${code}" class="form-control mb-1" />
+          <button class="btn btn-sm btn-success me-2" onclick="updateQuizTime('${code}')">Update Time</button>
+          <button class="btn btn-sm btn-danger me-2" onclick="deleteQuiz('${code}')">Delete</button>
+          <button class="btn btn-sm btn-primary" onclick="viewLeaderboard('${code}')">Leaderboard</button>
+        </div>
+      `;
+    });
   });
 }
 
-// Update quiz time in Firestore
-async function updateQuizTime(code) {
+// Update quiz time
+window.updateQuizTime = async function (code) {
   const start = document.getElementById("start_" + code).value;
   const end = document.getElementById("end_" + code).value;
   const ref = doc(db, "quizzes", code);
   await updateDoc(ref, { startAt: start, endAt: end });
   alert("Quiz time updated successfully.");
-}
+};
 
 // Delete quiz
-async function deleteQuiz(code) {
+window.deleteQuiz = async function (code) {
   if (confirm("Are you sure you want to delete this quiz?")) {
     await deleteDoc(doc(db, "quizzes", code));
-    loadQuizHistory();
+    // No need to reload manually; onSnapshot will auto-refresh
   }
-}
+};
 
 // View leaderboard
-async function viewLeaderboard(code) {
+window.viewLeaderboard = async function (code) {
   const boardRef = doc(db, "leaderboards", code);
   const docSnap = await getDoc(boardRef);
   const board = docSnap.exists() ? docSnap.data().entries || [] : [];
@@ -206,4 +208,4 @@ async function viewLeaderboard(code) {
   });
 
   alert(message);
-}
+};
