@@ -26,10 +26,10 @@ startBtn.addEventListener("click", async () => {
   const name = document.getElementById("name").value.trim();
   const code = document.getElementById("code").value.trim().toUpperCase();
 
-  if (name === "" || code.length !== 5) {
-    codeErr.textContent = "Enter your name and a 5-letter quiz code.";
-    return;
-  }
+  if (name === "" || code === "") {
+  codeErr.textContent = "Enter your name and quiz code.";
+  return;
+}
 
   try {
     const quizRef = doc(db, "quizzes", code);
