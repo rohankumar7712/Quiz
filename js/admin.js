@@ -59,10 +59,14 @@ document.getElementById("addQ").onclick = function () {
 
 // Save quiz to Firestore
 document.getElementById("saveQ").onclick = async function () {
-  const title = document.getElementById("quizTitle").value.trim();
-  const start = document.getElementById("startDate").value;
-  const end = document.getElementById("endDate").value;
+  console.log("🔄 Save button clicked");
+
+  const title = document.getElementById("quizTitle")?.value.trim();
+  const start = document.getElementById("startDate")?.value;
+  const end = document.getElementById("endDate")?.value;
   const blocks = document.querySelectorAll("#questions .mb-3");
+
+  console.log({ title, start, end, blockCount: blocks.length });
 
   if (!title || !start || !end || blocks.length === 0) {
     alert("Fill all details and add at least one question.");
@@ -70,34 +74,47 @@ document.getElementById("saveQ").onclick = async function () {
   }
 
   const questions = [];
-  blocks.forEach(block => {
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
     const inputs = block.querySelectorAll("input");
     const select = block.querySelector("select");
-    questions.push({
-      question: inputs[0].value,
-      a: inputs[1].value,
-      b: inputs[2].value,
-      c: inputs[3].value,
-      d: inputs[4].value,
-      correct: select.value
-    });
-  });
+    const question = inputs[0]?.value.trim();
+    const a = inputs[1]?.value.trim();
+    const b = inputs[2]?.value.trim();
+    const c = inputs[3]?.value.trim();
+    const d = inputs[4]?.value.trim();
+    const correct = select?.value;
 
-  const code = Math.random().toString(36).substring(2, 7).toUpperCase();
+    console.log(`Q${i+1}`, { question, a, b, c, d, correct });
+
+    if (!question || !a || !b || !c || !d || !["a","b","c","d"].includes(correct)) {
+      alert(`Fill all fields & select correct answer in question ${i+1}.`);
+      return;
+    }
+
+    questions.push({ question, a, b, c, d, correct });
+  }
+
+  const code = Math.random().toString(36).substring(2,7).toUpperCase();
+  console.log("Generated quiz code:", code);
+
   try {
     await setDoc(doc(db, "quizzes", code), {
       title,
       questions,
-      startAt: start,
-      endAt: end,
+      startAt: new Date(start).toISOString(),
+      endAt: new Date(end).toISOString(),
       createdAt: new Date().toISOString()
     });
     document.getElementById("saveMsg").textContent = "Quiz saved! Code: " + code;
+    console.log("Quiz written to Firestore ✔️");
   } catch (err) {
-    console.error("Error saving quiz:", err);
-    alert("Failed to save quiz.");
+    console.error("Error writing quiz:", err);
+    alert("Failed to save quiz. Check console for details.");
   }
 };
+
+
 
 // Parse raw text input to generate questions
 document.getElementById("parseTextBtn").onclick = function () {
