@@ -1,5 +1,24 @@
 // js/admin.js
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, getDoc, getDocs,
+  deleteDoc, updateDoc
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC_lvF65P7vaKYnKEMrpHfJroMe-vh3w4U",
+  authDomain: "quizapp-f370d.firebaseapp.com",
+  projectId: "quizapp-f370d",
+  storageBucket: "quizapp-f370d.firebasestorage.app",
+  messagingSenderId: "822956185807",
+  appId: "1:822956185807:web:3d2244d53f9bb61ec33fba"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Admin login
 document.getElementById("loginBtn").onclick = function () {
   const user = document.getElementById("user").value.trim();
   const pass = document.getElementById("pass").value.trim();
@@ -14,6 +33,7 @@ document.getElementById("loginBtn").onclick = function () {
   }
 };
 
+// Add a new empty question block
 document.getElementById("addQ").onclick = function () {
   const div = document.createElement("div");
   div.classList.add("mb-3");
@@ -37,7 +57,8 @@ document.getElementById("addQ").onclick = function () {
   document.getElementById("questions").appendChild(div);
 };
 
-document.getElementById("saveQ").onclick = function () {
+// Save quiz to Firestore
+document.getElementById("saveQ").onclick = async function () {
   const title = document.getElementById("quizTitle").value.trim();
   const start = document.getElementById("startDate").value;
   const end = document.getElementById("endDate").value;
@@ -63,17 +84,22 @@ document.getElementById("saveQ").onclick = function () {
   });
 
   const code = Math.random().toString(36).substring(2, 7).toUpperCase();
-  localStorage.setItem("quiz_" + code, JSON.stringify({
-    title: title,
-    questions: questions,
-    startAt: start,
-    endAt: end,
-    createdAt: new Date().toISOString()
-  }));
-
-  document.getElementById("saveMsg").textContent = "Quiz saved! Code: " + code;
+  try {
+    await setDoc(doc(db, "quizzes", code), {
+      title,
+      questions,
+      startAt: start,
+      endAt: end,
+      createdAt: new Date().toISOString()
+    });
+    document.getElementById("saveMsg").textContent = "Quiz saved! Code: " + code;
+  } catch (err) {
+    console.error("Error saving quiz:", err);
+    alert("Failed to save quiz.");
+  }
 };
 
+// Parse raw text input to generate questions
 document.getElementById("parseTextBtn").onclick = function () {
   const rawText = document.getElementById("quizText").value.trim();
   const questionBlocks = rawText.split(/\n\s*\n/);
@@ -121,61 +147,63 @@ document.getElementById("parseTextBtn").onclick = function () {
   }
 };
 
-function loadQuizHistory() {
+// Load all quizzes from Firestore
+window.loadQuizHistory = async function () {
   const output = document.getElementById("quizList");
   output.innerHTML = "";
 
-  for (let key in localStorage) {
-    if (key.startsWith("quiz_")) {
-      const quiz = JSON.parse(localStorage.getItem(key));
+  const snapshot = await getDocs(collection(db, "quizzes"));
+  snapshot.forEach(docSnap => {
+    const quiz = docSnap.data();
+    const code = docSnap.id;
 
-      output.innerHTML += `
-        <div class="border p-2 rounded mb-2">
-          <strong>${quiz.title}</strong><br>
-          Code: <code>${key.slice(5)}</code><br>
-          Start: <input type="datetime-local" value="${quiz.startAt}" id="start_${key}" class="form-control mb-1" />
-          End: <input type="datetime-local" value="${quiz.endAt}" id="end_${key}" class="form-control mb-1" />
-          <button class="btn btn-sm btn-success me-2" onclick="updateQuizTime('${key}')">Update Time</button>
-          <button class="btn btn-sm btn-danger me-2" onclick="deleteQuiz('${key}')">Delete</button>
-          <button class="btn btn-sm btn-primary" onclick="viewLeaderboard('${key}')">Leaderboard</button>
-        </div>
-      `;
-    }
-  }
-}
+    output.innerHTML += `
+      <div class="border p-2 rounded mb-2">
+        <strong>${quiz.title}</strong><br>
+        Code: <code>${code}</code><br>
+        Start: <input type="datetime-local" value="${quiz.startAt}" id="start_${code}" class="form-control mb-1" />
+        End: <input type="datetime-local" value="${quiz.endAt}" id="end_${code}" class="form-control mb-1" />
+        <button class="btn btn-sm btn-success me-2" onclick="updateQuizTime('${code}')">Update Time</button>
+        <button class="btn btn-sm btn-danger me-2" onclick="deleteQuiz('${code}')">Delete</button>
+        <button class="btn btn-sm btn-primary" onclick="viewLeaderboard('${code}')">Leaderboard</button>
+      </div>
+    `;
+  });
+};
 
-function updateQuizTime(key) {
-  const start = document.getElementById("start_" + key).value;
-  const end = document.getElementById("end_" + key).value;
-  const quiz = JSON.parse(localStorage.getItem(key));
-  quiz.startAt = start;
-  quiz.endAt = end;
-  localStorage.setItem(key, JSON.stringify(quiz));
-  alert("Quiz time updated successfully.");
-}
+// Update quiz start/end time
+window.updateQuizTime = async function (code) {
+  const start = document.getElementById("start_" + code).value;
+  const end = document.getElementById("end_" + code).value;
+  await updateDoc(doc(db, "quizzes", code), {
+    startAt: start,
+    endAt: end
+  });
+  alert("Quiz time updated.");
+};
 
-function deleteQuiz(key) {
+// Delete quiz
+window.deleteQuiz = async function (code) {
   if (confirm("Are you sure you want to delete this quiz?")) {
-    localStorage.removeItem(key);
+    await deleteDoc(doc(db, "quizzes", code));
     loadQuizHistory();
   }
-}
+};
 
-function viewLeaderboard(key) {
-  const code = key.slice(5); // remove 'quiz_' prefix
-  const board = JSON.parse(localStorage.getItem("leaderboard_" + code)) || [];
-
-  if (board.length === 0) {
-    alert("No student data for this quiz yet.");
+// View leaderboard from Firestore
+window.viewLeaderboard = async function (code) {
+  const leaderboardSnap = await getDoc(doc(db, "leaderboards", code));
+  if (!leaderboardSnap.exists()) {
+    alert("No student data yet.");
     return;
   }
 
+  const board = leaderboardSnap.data().entries || [];
   board.sort((a, b) => b.score - a.score);
-  let message = "Leaderboard:\n\n";
+
+  let msg = "Leaderboard:\n\n";
   board.forEach((entry, i) => {
-    message += `${i + 1}. ${entry.name} - ${entry.score}\n`;
+    msg += `${i + 1}. ${entry.name} - ${entry.score}\n`;
   });
-
-  alert(message);
-}
-
+  alert(msg);
+};
