@@ -1,10 +1,6 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 import {
-  initializeApp
-} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-
-import {
-  getFirestore, collection, getDocs, updateDoc,
-  deleteDoc, doc, setDoc, getDoc, onSnapshot
+  getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // Firebase config
@@ -20,7 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Admin Login
+// Admin login
 document.getElementById("loginBtn").onclick = () => {
   const user = document.getElementById("user").value.trim();
   const pass = document.getElementById("pass").value.trim();
@@ -30,14 +26,14 @@ document.getElementById("loginBtn").onclick = () => {
     document.getElementById("loginBox").classList.add("hidden");
     document.getElementById("builder").classList.remove("hidden");
     document.getElementById("history").classList.remove("hidden");
-    listenToQuizHistory(); // ✅ use listener instead of manual load
+    listenToQuizHistory(); // Real-time loading
   } else {
     errBox.textContent = "Invalid username or password!";
   }
 };
 
 // Add question block
-document.getElementById("addQ").onclick = function () {
+document.getElementById("addQ").onclick = () => {
   const div = document.createElement("div");
   div.classList.add("mb-3");
   const qIndex = document.querySelectorAll("#questions .mb-3").length + 1;
@@ -60,8 +56,8 @@ document.getElementById("addQ").onclick = function () {
   document.getElementById("questions").appendChild(div);
 };
 
-// Save quiz to Firestore
-document.getElementById("saveQ").onclick = async function () {
+// Save quiz
+document.getElementById("saveQ").onclick = async () => {
   const title = document.getElementById("quizTitle").value.trim();
   const start = document.getElementById("startDate").value;
   const end = document.getElementById("endDate").value;
@@ -99,14 +95,14 @@ document.getElementById("saveQ").onclick = async function () {
   document.getElementById("saveMsg").textContent = "Quiz saved! Code: " + code;
 };
 
-// Parse text to questions
-document.getElementById("parseTextBtn").onclick = function () {
+// Parse quiz text
+document.getElementById("parseTextBtn").onclick = () => {
   const rawText = document.getElementById("quizText").value.trim();
-  const questionBlocks = rawText.split(/\n\s*\n/);
-  const questionsDiv = document.getElementById("questions");
-  questionsDiv.innerHTML = "";
+  const blocks = rawText.split(/\n\s*\n/);
+  const target = document.getElementById("questions");
+  target.innerHTML = "";
 
-  questionBlocks.forEach((block, index) => {
+  blocks.forEach((block, index) => {
     const lines = block.trim().split("\n").map(l => l.trim());
     if (lines.length < 6) return;
 
@@ -139,20 +135,20 @@ document.getElementById("parseTextBtn").onclick = function () {
       </select>
       <hr />
     `;
-    questionsDiv.appendChild(div);
+    target.appendChild(div);
   });
 
-  if (questionsDiv.innerHTML === "") {
-    alert("No valid questions found. Make sure the format is correct.");
+  if (target.innerHTML === "") {
+    alert("No valid questions found.");
   }
 };
 
-// Real-time Quiz List
+// Real-time quiz display
 function listenToQuizHistory() {
   const output = document.getElementById("quizList");
-  const quizzesRef = collection(db, "quizzes");
+  const quizRef = collection(db, "quizzes");
 
-  onSnapshot(quizzesRef, snapshot => {
+  onSnapshot(quizRef, snapshot => {
     output.innerHTML = "";
     snapshot.forEach(docSnap => {
       const quiz = docSnap.data();
@@ -173,39 +169,37 @@ function listenToQuizHistory() {
   });
 }
 
-// Update quiz time
-window.updateQuizTime = async function (code) {
+// Update time
+window.updateQuizTime = async (code) => {
   const start = document.getElementById("start_" + code).value;
   const end = document.getElementById("end_" + code).value;
-  const ref = doc(db, "quizzes", code);
-  await updateDoc(ref, { startAt: start, endAt: end });
-  alert("Quiz time updated successfully.");
+  await updateDoc(doc(db, "quizzes", code), { startAt: start, endAt: end });
+  alert("Updated.");
 };
 
 // Delete quiz
-window.deleteQuiz = async function (code) {
-  if (confirm("Are you sure you want to delete this quiz?")) {
+window.deleteQuiz = async (code) => {
+  if (confirm("Delete this quiz?")) {
     await deleteDoc(doc(db, "quizzes", code));
-    // No need to reload manually; onSnapshot will auto-refresh
   }
 };
 
 // View leaderboard
-window.viewLeaderboard = async function (code) {
-  const boardRef = doc(db, "leaderboards", code);
-  const docSnap = await getDoc(boardRef);
-  const board = docSnap.exists() ? docSnap.data().entries || [] : [];
+window.viewLeaderboard = async (code) => {
+  const ref = doc(db, "leaderboards", code);
+  const snap = await getDoc(ref);
+  const entries = snap.exists() ? snap.data().entries || [] : [];
 
-  if (board.length === 0) {
-    alert("No student data for this quiz yet.");
+  if (entries.length === 0) {
+    alert("No students have taken this quiz.");
     return;
   }
 
-  board.sort((a, b) => b.score - a.score);
-  let message = "Leaderboard:\n\n";
-  board.forEach((entry, i) => {
-    message += `${i + 1}. ${entry.name} - ${entry.score}\n`;
+  entries.sort((a, b) => b.score - a.score);
+  let msg = "Leaderboard:\n\n";
+  entries.forEach((e, i) => {
+    msg += `${i + 1}. ${e.name} - ${e.score}\n`;
   });
 
-  alert(message);
+  alert(msg);
 };
