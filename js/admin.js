@@ -1,6 +1,7 @@
+// Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot
+  getFirestore, collection, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 // Firebase config
@@ -26,7 +27,7 @@ document.getElementById("loginBtn").onclick = () => {
     document.getElementById("loginBox").classList.add("hidden");
     document.getElementById("builder").classList.remove("hidden");
     document.getElementById("history").classList.remove("hidden");
-    listenToQuizHistory(); // Real-time loading
+    listenToQuizHistory();
   } else {
     errBox.textContent = "Invalid username or password!";
   }
@@ -95,81 +96,60 @@ document.getElementById("saveQ").onclick = async () => {
   document.getElementById("saveMsg").textContent = "Quiz saved! Code: " + code;
 };
 
-// Parse quiz text
-document.getElementById("parseTextBtn").onclick = () => {
-  const rawText = document.getElementById("quizText").value.trim();
-  const blocks = rawText.split(/\n\s*\n/);
-  const target = document.getElementById("questions");
-  target.innerHTML = "";
-
-  blocks.forEach((block, index) => {
-    const lines = block.trim().split("\n").map(l => l.trim());
-    if (lines.length < 6) return;
-
-    const qText = lines[0].replace(/^Q:\s*/i, "");
-    const options = {
-      a: lines[1].replace(/^A\)\s*/i, ""),
-      b: lines[2].replace(/^B\)\s*/i, ""),
-      c: lines[3].replace(/^C\)\s*/i, ""),
-      d: lines[4].replace(/^D\)\s*/i, "")
-    };
-    const correct = lines[5].match(/Answer:\s*([ABCD])/i);
-    if (!correct) return;
-    const correctAns = correct[1].toLowerCase();
-
-    const div = document.createElement("div");
-    div.classList.add("mb-3");
-    div.innerHTML = `
-      <label class="form-label fw-bold">Question ${index + 1}</label>
-      <input type="text" class="form-control mb-2" value="${qText}" />
-      <input type="text" class="form-control mb-1" value="${options.a}" />
-      <input type="text" class="form-control mb-1" value="${options.b}" />
-      <input type="text" class="form-control mb-1" value="${options.c}" />
-      <input type="text" class="form-control mb-1" value="${options.d}" />
-      <select class="form-select">
-        <option disabled>Select correct answer</option>
-        <option value="a" ${correctAns === "a" ? "selected" : ""}>A</option>
-        <option value="b" ${correctAns === "b" ? "selected" : ""}>B</option>
-        <option value="c" ${correctAns === "c" ? "selected" : ""}>C</option>
-        <option value="d" ${correctAns === "d" ? "selected" : ""}>D</option>
-      </select>
-      <hr />
-    `;
-    target.appendChild(div);
-  });
-
-  if (target.innerHTML === "") {
-    alert("No valid questions found.");
-  }
-};
-
-// Real-time quiz display
 function listenToQuizHistory() {
   const output = document.getElementById("quizList");
   const quizRef = collection(db, "quizzes");
 
-  onSnapshot(quizRef, snapshot => {
+  onSnapshot(quizRef, async (snapshot) => {
     output.innerHTML = "";
-    snapshot.forEach(docSnap => {
+
+    for (const docSnap of snapshot.docs) {
       const quiz = docSnap.data();
       const code = docSnap.id;
 
+      // ✅ Get the leaderboard document instead of a subcollection
+      const leaderboardRef = doc(db, "leaderboards", code);
+      const leaderboardSnap = await getDoc(leaderboardRef);
+
+      let reviews = [];
+      if (leaderboardSnap.exists()) {
+        reviews = leaderboardSnap.data().entries || [];
+      }
+
+      // ✅ Sort by score descending
+      reviews.sort((a, b) => b.score - a.score);
+
+      let reviewHTML = "";
+      reviews.forEach((rev, index) => {
+        reviewHTML += `
+          <div class="d-flex justify-content-between align-items-center px-2 py-1 border-top">
+            <div>${index + 1}. ${rev.name} - ${rev.score}</div>
+            <a href="review.html?code=${code}&student=${encodeURIComponent(rev.name)}" class="btn btn-sm btn-outline-secondary">Review</a>
+          </div>
+        `;
+      });
+
       output.innerHTML += `
-        <div class="border p-2 rounded mb-2">
-          <strong>${quiz.title}</strong><br>
-          Code: <code>${code}</code><br>
-          Start: <input type="datetime-local" value="${quiz.startAt}" id="start_${code}" class="form-control mb-1" />
-          End: <input type="datetime-local" value="${quiz.endAt}" id="end_${code}" class="form-control mb-1" />
-          <button class="btn btn-sm btn-success me-2" onclick="updateQuizTime('${code}')">Update Time</button>
-          <button class="btn btn-sm btn-danger me-2" onclick="deleteQuiz('${code}')">Delete</button>
-          <button class="btn btn-sm btn-primary" onclick="viewLeaderboard('${code}')">Leaderboard</button>
+        <div class="border rounded mb-3 p-3 bg-light">
+          <div class="mb-2"><strong>${quiz.title}</strong> <br> Code: <span class="text-danger">${code}</span></div>
+          <div class="mb-2">Start: <input type="datetime-local" value="${quiz.startAt}" id="start_${code}" class="form-control" /></div>
+          <div class="mb-2">End: <input type="datetime-local" value="${quiz.endAt}" id="end_${code}" class="form-control" /></div>
+          <div class="mb-3">
+            <button class="btn btn-sm btn-success me-2" onclick="updateQuizTime('${code}')">Update Time</button>
+            <button class="btn btn-sm btn-danger me-2" onclick="deleteQuiz('${code}')">Delete</button>
+          </div>
+          <div class="bg-white p-2 rounded">
+            <h6 class="mb-2">Leaderboard:</h6>
+            ${reviewHTML || "<i>No student attempts yet.</i>"}
+          </div>
         </div>
       `;
-    });
+    }
   });
 }
 
-// Update time
+
+
 window.updateQuizTime = async (code) => {
   const start = document.getElementById("start_" + code).value;
   const end = document.getElementById("end_" + code).value;
@@ -177,29 +157,8 @@ window.updateQuizTime = async (code) => {
   alert("Updated.");
 };
 
-// Delete quiz
 window.deleteQuiz = async (code) => {
   if (confirm("Delete this quiz?")) {
     await deleteDoc(doc(db, "quizzes", code));
   }
-};
-
-// View leaderboard
-window.viewLeaderboard = async (code) => {
-  const ref = doc(db, "leaderboards", code);
-  const snap = await getDoc(ref);
-  const entries = snap.exists() ? snap.data().entries || [] : [];
-
-  if (entries.length === 0) {
-    alert("No students have taken this quiz.");
-    return;
-  }
-
-  entries.sort((a, b) => b.score - a.score);
-  let msg = "Leaderboard:\n\n";
-  entries.forEach((e, i) => {
-    msg += `${i + 1}. ${e.name} - ${e.score}\n`;
-  });
-
-  alert(msg);
 };

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quiz Review</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 2rem; background-color: #f9f9f9; }
+    .correct { color: green; }
+    .wrong { color: red; }
+    .question-box {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="reviewContent">
+    <h2 class="mb-4">Quiz Review</h2>
+    <div id="studentName" class="mb-2 fw-bold"></div>
+    <div id="scoreInfo" class="mb-3 text-primary fw-semibold"></div>
+    <div id="reviewContainer"></div>
+    <a href="admin.html" class="btn btn-secondary mt-4 me-2">Back to Dashboard</a>
+    <button id="downloadPdf" class="btn btn-success mt-4">Download as PDF</button>
+  </div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC_lvF65P7vaKYnKEMrpHfJroMe-vh3w4U",
+      authDomain: "quizapp-f370d.firebaseapp.com",
+      projectId: "quizapp-f370d",
+      storageBucket: "quizapp-f370d.appspot.com",
+      messagingSenderId: "822956185807",
+      appId: "1:822956185807:web:3d2244d53f9bb61ec33fba"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const studentName = params.get("student");
+
+    document.getElementById("studentName").textContent = "Student: " + studentName;
+
+    async function loadReview() {
+      try {
+        const reviewDocRef = doc(db, `review_${code}`, studentName);
+        const docSnap = await getDoc(reviewDocRef);
+
+        if (!docSnap.exists()) {
+          document.getElementById("reviewContainer").innerHTML = "<p class='text-danger'>No review data found.</p>";
+          return;
+        }
+
+        const data = docSnap.data();
+        document.getElementById("scoreInfo").textContent =
+          `Score: ${data.score} | Submitted: ${new Date(data.submittedAt.seconds * 1000).toLocaleString()}`;
+
+        const container = document.getElementById("reviewContainer");
+        container.innerHTML = "";
+
+        data.answers.forEach((entry, index) => {
+          const div = document.createElement("div");
+          div.className = "question-box";
+
+          const opts = entry.options || {};
+          const keys = ['a', 'b', 'c', 'd'];
+
+          let optionsHtml = '';
+          keys.forEach((key, i) => {
+            const optionText = Array.isArray(opts) ? opts[i] : opts[key];
+            if (optionText) {
+              optionsHtml += `<div>${optionText}</div>`;
+            }
+          });
+
+          div.innerHTML = `
+            <p><strong>Q${index + 1}.</strong> ${entry.question.replace(/^Q\d+\.\s*/, '')}</p>
+            <div class="ms-3 mb-2">${optionsHtml}</div>
+            <p class="ms-3"><strong>Your Answer:</strong> ${entry.selected || "Not answered"} ${entry.correct === entry.selected ? '✅' : '❌'}</p>
+            <p class="ms-3"><strong>Correct Answer:</strong> ${entry.correct}</p>
+          `;
+
+          container.appendChild(div);
+        });
+
+        // Attach PDF download logic
+        document.getElementById("downloadPdf").addEventListener("click", () => {
+          downloadPDF(studentName, code);
+        });
+
+      } catch (error) {
+        console.error("Error loading review:", error);
+        document.getElementById("reviewContainer").innerHTML = "<p class='text-danger'>Failed to load review. Check console for errors.</p>";
+      }
+    }
+
+    loadReview();
+  </script>
+
+  <!-- jsPDF + html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    async function downloadPDF(studentName, code) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF("p", "pt", "a4");
+
+      const element = document.getElementById("reviewContent");
+      await html2canvas(element).then(canvas => {
+        const imgData = canvas.toDataURL("image/png");
+        const imgProps = doc.getImageProperties(imgData);
+        const pdfWidth = doc.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        doc.save(`${studentName}_${code}.pdf`);
+      });
+    }
+  </script>
+</body>
+</html>
