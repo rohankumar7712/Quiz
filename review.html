@@ -23,9 +23,6 @@
     .question-box p {
       margin: 2px 0;
     }
-    .question-box strong {
-      font-weight: 600;
-    }
     .correct { color: green; font-weight: 500; }
     .wrong { color: red; font-weight: 500; }
     .no-print {
@@ -42,7 +39,7 @@
 </head>
 <body>
   <div class="container" id="reviewContent">
-    <h4 class="fw-bold mb-2">Quiz Review</h4>
+    <h4 id="quizTitle" class="fw-bold mb-2">Quiz Review</h4>
     <div id="studentName" class="mb-1 text-dark"></div>
     <div id="scoreInfo" class="mb-3 text-primary"></div>
     <div id="reviewContainer"></div>
@@ -80,6 +77,17 @@
 
     document.getElementById("studentName").textContent = "Student: " + studentName;
 
+    // Load Quiz Name
+    async function loadQuizName() {
+      const quizDocRef = doc(db, "quizzes", code);
+      const quizSnap = await getDoc(quizDocRef);
+      if (quizSnap.exists()) {
+        const quizData = quizSnap.data();
+        document.getElementById("quizTitle").textContent = `Quiz Review – ${quizData.title}`;
+      }
+    }
+
+    // Load Review
     async function loadReview() {
       try {
         const reviewDocRef = doc(db, `review_${code}`, studentName);
@@ -107,7 +115,6 @@
           keys.forEach((key, i) => {
             let optionText = Array.isArray(opts) ? opts[i] : opts[key];
             if (optionText) {
-              // Remove duplicate labels (e.g., "a. Apple" → "Apple")
               optionText = optionText.replace(/^[a-dA-D]\.\s*/, '');
               optionsHtml += `<div>${key}. ${optionText}</div>`;
             }
@@ -135,6 +142,7 @@
       }
     }
 
+    loadQuizName();
     loadReview();
   </script>
 
