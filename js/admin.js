@@ -52,11 +52,52 @@ document.getElementById("addQ").onclick = () => {
       <option value="c">C</option>
       <option value="d">D</option>
     </select>
+    <input type="number" class="form-control mb-2" placeholder="Time limit in seconds (default 15)" min="5" value="15" />
     <hr />
   `;
   document.getElementById("questions").appendChild(div);
 };
+// Parse text area questions
+const parseTextBtn = document.getElementById("parseTextBtn");
+parseTextBtn.onclick = () => {
+  const rawText = document.getElementById("quizText").value.trim();
+  const blocks = rawText.split(/\n\s*Q\d+\./).filter(q => q.trim() !== "");
 
+  blocks.forEach((block, idx) => {
+    const lines = block.trim().split("\n").map(l => l.trim());
+    const questionText = lines[0].replace(/^Q\d+\.\s*/, "");
+    const opts = { a: '', b: '', c: '', d: '' };
+    lines.forEach(line => {
+      if (/^a\./i.test(line)) opts.a = line.replace(/^a\./i, '').trim();
+      if (/^b\./i.test(line)) opts.b = line.replace(/^b\./i, '').trim();
+      if (/^c\./i.test(line)) opts.c = line.replace(/^c\./i, '').trim();
+      if (/^d\./i.test(line)) opts.d = line.replace(/^d\./i, '').trim();
+    });
+    const correctLine = lines.find(l => /^correct:/i.test(l));
+    const correct = correctLine ? correctLine.split(":")[1].trim().toLowerCase() : "";
+
+    const div = document.createElement("div");
+    div.classList.add("mb-3");
+    div.innerHTML = `
+      <label class="form-label fw-bold">Question ${idx + 1}</label>
+      <input type="text" class="form-control mb-2" placeholder="Question" value="${questionText}" />
+      <input type="text" class="form-control mb-1" placeholder="Option A" value="${opts.a}" />
+      <input type="text" class="form-control mb-1" placeholder="Option B" value="${opts.b}" />
+      <input type="text" class="form-control mb-1" placeholder="Option C" value="${opts.c}" />
+      <input type="text" class="form-control mb-1" placeholder="Option D" value="${opts.d}" />
+      <select class="form-select">
+        <option disabled>Select correct answer</option>
+        <option value="a" ${correct === "a" ? "selected" : ""}>A</option>
+        <option value="b" ${correct === "b" ? "selected" : ""}>B</option>
+        <option value="c" ${correct === "c" ? "selected" : ""}>C</option>
+        <option value="d" ${correct === "d" ? "selected" : ""}>D</option>
+      </select>
+      <input type="number" class="form-control mb-2" placeholder="Time limit in seconds (default 15)" min="5" value="15" />
+      <hr />
+    `;
+    document.getElementById("questions").appendChild(div);
+  });
+};
 // Save quiz
 document.getElementById("saveQ").onclick = async () => {
   const title = document.getElementById("quizTitle").value.trim();
@@ -71,17 +112,18 @@ document.getElementById("saveQ").onclick = async () => {
 
   const questions = [];
   blocks.forEach(block => {
-    const inputs = block.querySelectorAll("input");
-    const select = block.querySelector("select");
-    questions.push({
-      question: inputs[0].value,
-      a: inputs[1].value,
-      b: inputs[2].value,
-      c: inputs[3].value,
-      d: inputs[4].value,
-      correct: select.value
-    });
+  const inputs = block.querySelectorAll("input");
+  const select = block.querySelector("select");
+  questions.push({
+    question: inputs[0].value,
+    a: inputs[1].value,
+    b: inputs[2].value,
+    c: inputs[3].value,
+    d: inputs[4].value,
+    correct: select.value,
+    timeLimit: parseInt(inputs[5].value) || 15  // Default to 15 if not valid
   });
+});
 
   const code = Math.random().toString(36).substring(2, 7).toUpperCase();
 
@@ -122,11 +164,16 @@ function listenToQuizHistory() {
       let reviewHTML = "";
       reviews.forEach((rev, index) => {
         reviewHTML += `
-          <div class="d-flex justify-content-between align-items-center px-2 py-1 border-top">
-            <div>${index + 1}. ${rev.name} - ${rev.score}</div>
-            <a href="review.html?code=${code}&student=${encodeURIComponent(rev.name)}" class="btn btn-sm btn-outline-secondary">Review</a>
-          </div>
-        `;
+  <div class="d-flex justify-content-between align-items-center px-2 py-1 border-top flex-wrap gap-2">
+    <div>${index + 1}. ${rev.name} - ${rev.score}</div>
+    <div class="d-flex gap-2">
+      <a href="review.html?code=${code}&student=${encodeURIComponent(rev.name)}" class="btn btn-sm btn-outline-secondary">Review</a>
+      <button class="btn btn-sm btn-outline-primary" onclick="generateMail('${rev.name}', '${quiz.title}', '${code}', ${rev.score})">Mail</button>
+    </div>
+  </div>
+`;
+
+
       });
 
       output.innerHTML += `
@@ -147,6 +194,39 @@ function listenToQuizHistory() {
     }
   });
 }
+window.generateMail = async (studentName, quizTitle, quizCode, score, timestamp) => {
+  // 🟡 Fetch quiz data from Firestore to count questions
+  const quizSnap = await getDoc(doc(db, "quizzes", quizCode));
+  const totalQuestions = quizSnap.exists() ? quizSnap.data().questions.length : "N/A";
+  const totalMarks = totalQuestions;
+
+  const formattedDate = new Date(timestamp).toLocaleString();
+
+  const subject = `Quiz Result Announcement: "${quizTitle}"`;
+
+  const body = `Dear ${studentName},
+
+We hope you're doing well!
+
+Here are the details of your recent quiz attempt:
+
+📘 Quiz Title: ${quizTitle}  
+📌 Quiz Code: ${quizCode}  
+❓ Total Questions: ${totalQuestions}  
+✅ Total Marks: ${totalMarks}  
+🎯 Your Score: ${score}
+
+Thank you for your participation! Keep striving for excellence — every attempt is a step toward mastery.
+
+Best regards,  
+📩 Rohankumar(Quiz Admin)`;
+
+  document.getElementById("mailSubject").value = subject;
+  document.getElementById("mailBody").value = body;
+
+  const modal = new bootstrap.Modal(document.getElementById('mailModal'));
+  modal.show();
+};
 
 
 

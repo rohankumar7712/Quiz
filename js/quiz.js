@@ -55,9 +55,7 @@ async function loadQuiz() {
   }
   quizData = quizSnap.data();
   titleBox.textContent = quizData.title;
-  timeLeft = quizData.questions.length * 30;
   loadQuestion();
-  startTimer();
 }
 
 function loadQuestion() {
@@ -68,35 +66,33 @@ function loadQuestion() {
   options.c.textContent = q.c;
   options.d.textContent = q.d;
   answers.forEach(ans => ans.checked = false);
+
+  const timeLimit = q.timeLimit || 15; // default 15 seconds if not provided
+  startTimer(timeLimit);
 }
 
-function startTimer() {
+function startTimer(seconds) {
+  clearInterval(timerInterval);
+  timeLeft = seconds;
+
   timerInterval = setInterval(() => {
     const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
-    timerDisplay.textContent = `Time left: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    const secs = timeLeft % 60;
+    timerDisplay.textContent = `Time left: ${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     timeLeft--;
+
     if (timeLeft < 0) {
       clearInterval(timerInterval);
-      handleQuizEnd();
-      alert("⏰ Time's up!");
+      autoSubmitAnswer();
     }
   }, 1000);
 }
 
-function handleQuizEnd() {
-  document.getElementById("quiz-body").classList.add("hidden");
-  submitBtn.classList.add("hidden");
-  finishBtn.classList.remove("hidden");
-}
-
-submitBtn.onclick = () => {
+function autoSubmitAnswer() {
   const selected = [...answers].find(ans => ans.checked);
-  if (!selected) return;
-
   const q = quizData.questions[currentQ];
   const correct = q.correct;
-  const selectedAns = selected.id;
+  const selectedAns = selected ? selected.id : "none";
 
   if (selectedAns === correct) score++;
 
@@ -110,10 +106,20 @@ submitBtn.onclick = () => {
   if (currentQ < quizData.questions.length) {
     loadQuestion();
   } else {
-    clearInterval(timerInterval);
     handleQuizEnd();
   }
+}
+
+submitBtn.onclick = () => {
+  clearInterval(timerInterval);
+  autoSubmitAnswer();
 };
+
+function handleQuizEnd() {
+  document.getElementById("quiz-body").classList.add("hidden");
+  submitBtn.classList.add("hidden");
+  finishBtn.classList.remove("hidden");
+}
 
 finishBtn.onclick = async () => {
   try {
@@ -125,7 +131,6 @@ finishBtn.onclick = async () => {
     alert("❌ Something went wrong while submitting your quiz. Please check the console.");
   }
 };
-
 
 async function saveToLeaderboard() {
   const leaderboardRef = doc(db, "leaderboards", code);
@@ -141,7 +146,7 @@ async function saveToLeaderboard() {
 
 async function saveToReview() {
   const reviewCollectionName = `review_${code}`;
-  const markedAnsRef = doc(db, reviewCollectionName, studentName); // This is VALID: collection/document
+  const markedAnsRef = doc(db, reviewCollectionName, studentName);
 
   const formattedAnswers = answerReview.map((ans, i) => {
     const q = quizData.questions[i];
@@ -159,6 +164,5 @@ async function saveToReview() {
     answers: formattedAnswers
   });
 }
-
 
 loadQuiz();
