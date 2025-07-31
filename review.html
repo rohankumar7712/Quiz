@@ -1,34 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Quiz Review</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <style>
-    body { padding: 2rem; background-color: #f9f9f9; }
-    .correct { color: green; }
-    .wrong { color: red; }
+    body {
+      padding: 1rem;
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      font-size: 14px;
+    }
     .question-box {
       background: #fff;
-      border-radius: 8px;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 0 4px rgba(0,0,0,0.05);
+      page-break-inside: avoid;
+    }
+    .question-box p {
+      margin: 2px 0;
+    }
+    .question-box strong {
+      font-weight: 600;
+    }
+    .correct { color: green; font-weight: 500; }
+    .wrong { color: red; font-weight: 500; }
+    .no-print {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    @media print {
+      .no-print {
+        display: none !important;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container" id="reviewContent">
-    <h2 class="mb-4">Quiz Review</h2>
-    <div id="studentName" class="mb-2 fw-bold"></div>
-    <div id="scoreInfo" class="mb-3 text-primary fw-semibold"></div>
+    <h4 class="fw-bold mb-2">Quiz Review</h4>
+    <div id="studentName" class="mb-1 text-dark"></div>
+    <div id="scoreInfo" class="mb-3 text-primary"></div>
     <div id="reviewContainer"></div>
-    <a href="admin.html" class="btn btn-secondary mt-4 me-2">Back to Dashboard</a>
-    <button id="downloadPdf" class="btn btn-success mt-4">Download as PDF</button>
+
+    <div class="no-print">
+      <a href="admin.html" class="btn btn-secondary">Back</a>
+      <button id="downloadPdf" class="btn btn-success">Download as PDF</button>
+    </div>
   </div>
 
-  <!-- Firebase -->
+  <!-- Firebase & Firestore -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
     import {
@@ -78,55 +103,62 @@
 
           const opts = entry.options || {};
           const keys = ['a', 'b', 'c', 'd'];
-
           let optionsHtml = '';
           keys.forEach((key, i) => {
-            const optionText = Array.isArray(opts) ? opts[i] : opts[key];
+            let optionText = Array.isArray(opts) ? opts[i] : opts[key];
             if (optionText) {
-              optionsHtml += `<div>${optionText}</div>`;
+              // Remove duplicate labels (e.g., "a. Apple" → "Apple")
+              optionText = optionText.replace(/^[a-dA-D]\.\s*/, '');
+              optionsHtml += `<div>${key}. ${optionText}</div>`;
             }
           });
 
+          const correctIcon = entry.selected === entry.correct ? '✅' : '❌';
+          const answerClass = entry.selected === entry.correct ? 'correct' : 'wrong';
+
           div.innerHTML = `
             <p><strong>Q${index + 1}.</strong> ${entry.question.replace(/^Q\d+\.\s*/, '')}</p>
-            <div class="ms-3 mb-2">${optionsHtml}</div>
-            <p class="ms-3"><strong>Your Answer:</strong> ${entry.selected || "Not answered"} ${entry.correct === entry.selected ? '✅' : '❌'}</p>
-            <p class="ms-3"><strong>Correct Answer:</strong> ${entry.correct}</p>
+            <div class="ms-3 mb-1">${optionsHtml}</div>
+            <p class="ms-3 ${answerClass}" style="margin: 2px 0;"><strong>Your Answer:</strong> ${entry.selected || "Not answered"} ${correctIcon}</p>
+            <p class="ms-3" style="margin: 2px 0;"><strong>Correct Answer:</strong> ${entry.correct}</p>
           `;
-
           container.appendChild(div);
         });
 
-        // Attach PDF download logic
         document.getElementById("downloadPdf").addEventListener("click", () => {
           downloadPDF(studentName, code);
         });
 
       } catch (error) {
         console.error("Error loading review:", error);
-        document.getElementById("reviewContainer").innerHTML = "<p class='text-danger'>Failed to load review. Check console for errors.</p>";
+        document.getElementById("reviewContainer").innerHTML = "<p class='text-danger'>Failed to load review.</p>";
       }
     }
 
     loadReview();
   </script>
 
-  <!-- jsPDF + html2canvas -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- html2pdf.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script>
-    async function downloadPDF(studentName, code) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF("p", "pt", "a4");
+    function downloadPDF(studentName, code) {
+      const buttons = document.querySelector('.no-print');
+      buttons.style.display = 'none';
 
       const element = document.getElementById("reviewContent");
-      await html2canvas(element).then(canvas => {
-        const imgData = canvas.toDataURL("image/png");
-        const imgProps = doc.getImageProperties(imgData);
-        const pdfWidth = doc.internal.pageSize.getWidth();
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        doc.save(`${studentName}_${code}.pdf`);
+      const filename = `${studentName}_${code}.pdf`;
+
+      const opt = {
+        margin:       0.2,
+        filename:     filename,
+        image:        { type: 'jpeg', quality: 1 },
+        html2canvas:  { scale: 3.5, useCORS: true, scrollY: 0 },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+        buttons.style.display = 'flex';
       });
     }
   </script>
