@@ -36,6 +36,8 @@ The **Student** participates in quizzes and checks results.
 - **Available quizzes** → Browse and attempt quizzes.  
 
 ---
+## 📂 Project Structure
+
 QuizApp/
 │
 ├── admin/ # Admin pages
@@ -68,6 +70,7 @@ QuizApp/
 ├── quiz.html # Common quiz page
 ├── review.html # Review page
 └── index.html # Main entry point
+
 
 
 ---
