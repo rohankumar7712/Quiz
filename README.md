@@ -45,26 +45,24 @@ The **Student** participates in quizzes and checks results.
    git clone https://github.com/rohankumar7712/QuizApp.git
    cd QuizApp
 
+2. **Open in browser**  
+  Simply double-click index.html or right-click → Open with → Browser.
+Your app should now load locally.
+### 🔹 Deploy on Firebase
+1. **Install Firebase CLI**  
+    ```bash
+   npm install -g firebase-tools
+2. **Login to Firebase**
+    ```bash
+    firebase login
+3. **Initialize Firebase in your project (if not done already)**
+    ```bash
+    firebase init
 
-Open in browser
-
-Just double-click index.html to open in your browser.
-
-🔹 Deploy on Firebase (Optional)
-
-Install Firebase CLI:
-
-npm install -g firebase-tools
-
-
-Login to Firebase:
-
-firebase login
-
-
-Deploy to Firebase Hosting:
-
-firebase deploy
-
-
-
+    Select Hosting
+    Choose your Firebase project
+    Set public folder as your deployment folder (e.g., . or build)
+    Configure as a single-page app if using SPA (Yes/No as needed)
+4. **Deploy to Firebase Hosting**
+    ```bash
+    firebase deploy
