@@ -36,44 +36,6 @@ The **Student** participates in quizzes and checks results.
 - **Available quizzes** → Browse and attempt quizzes.  
 
 ---
-## 📂 Project Structure
-
-QuizApp/
-│
-├── admin/ # Admin pages
-│ ├── createQuiz.html
-│ ├── dashboard.html
-│ ├── performance.html
-│ ├── quizHistory.html
-│ ├── review.html
-│ ├── studentAllowance.html
-│ └── studentManage.html
-│
-├── student/ # Student pages
-│ ├── dashboard.html
-│ ├── history.html
-│ ├── quiz.html
-│ ├── result.html
-│ └── takeQuiz.html
-│
-├── js/ # JavaScript files
-│ ├── admin.js
-│ ├── quiz.js
-│ └── student.js
-│
-├── .css # Stylesheets folder
-├── .firebaserc # Firebase project config
-├── firebase.json # Firebase hosting config
-├── 404.html # Error page
-├── admin.html # Admin entry point
-├── student.html # Student entry point
-├── quiz.html # Common quiz page
-├── review.html # Review page
-└── index.html # Main entry point
-
-
-
----
 
 ## ⚙️ Setup & Run  
 
